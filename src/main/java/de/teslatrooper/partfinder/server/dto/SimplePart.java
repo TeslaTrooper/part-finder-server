@@ -1,5 +1,7 @@
 package de.teslatrooper.partfinder.server.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+
 public class SimplePart {
 
     private final String name;
@@ -7,7 +9,13 @@ public class SimplePart {
     private final int qty;
     private final Attribute[] attributes;
 
-    public SimplePart(final String name, final String location, final int qty, final Attribute[] attributes) {
+    public SimplePart(final String name, final String location, final int qty) {
+        this(name, location, qty, new Attribute[0]);
+    }
+
+    @JsonCreator
+    public SimplePart(final String name, final String location,
+                      final int qty, final Attribute[] attributes) {
         this.name = name;
         this.location = location;
         this.qty = qty;

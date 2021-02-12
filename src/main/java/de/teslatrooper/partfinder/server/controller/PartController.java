@@ -5,9 +5,17 @@ import de.teslatrooper.partfinder.server.dto.PartList;
 import de.teslatrooper.partfinder.server.dto.SimplePart;
 import de.teslatrooper.partfinder.server.service.PartService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import java.net.URI;
+import java.util.Optional;
 
 @RestController
+@RequestMapping("/parts")
+@CrossOrigin(origins = "http://localhost:4200", exposedHeaders = "Location")
 public class PartController {
 
     private final PartService service;
@@ -17,29 +25,37 @@ public class PartController {
         this.service = service;
     }
 
-    @PostMapping("/parts")
-    public String savePart(@RequestBody final SimplePart part) {
-        return service.save(part);
+    @PostMapping
+    public ResponseEntity<String> savePart(@RequestBody final SimplePart part) {
+        final String uuid = service.save(part);
+
+        if (uuid == null)
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{uuid}").buildAndExpand(uuid).toUri();
+        return ResponseEntity.created(location).build();
     }
 
-    @GetMapping(value = "/parts")
+    @GetMapping
     public PartList getParts() {
         return service.getParts();
     }
 
-    @GetMapping(value="/parts/{uuid}")
+    @GetMapping("/{uuid}")
     public Part getPart(@PathVariable("uuid") final String uuid) {
         return service.getPart(uuid);
     }
 
-    @PutMapping("/parts")
+    @PutMapping
     public void updatePart(@RequestBody final Part part) {
         service.update(part);
     }
 
-    @DeleteMapping("/parts/{uuid}")
-    public void deletePart(@PathVariable("uuid") final String uuid) {
-        service.delete(uuid);
+    @DeleteMapping("/{uuid}")
+    public ResponseEntity<Part> deletePart(@PathVariable("uuid") final String uuid) {
+        final Optional<Part> deletedPart = service.delete(uuid);
+
+        return ResponseEntity.of(deletedPart);
     }
 
 }
