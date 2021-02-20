@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class PartService {
@@ -26,8 +27,7 @@ public class PartService {
     }
 
     public String save(final SimplePart simplePart) {
-        if (simplePart == null || simplePart.getName() == null || simplePart.getLocation() == null)
-            return null;
+        validate(simplePart);
 
         Part part = new Part(simplePart);
         parts.put(part.getId(), part);
@@ -39,23 +39,36 @@ public class PartService {
         return new PartList(parts.values());
     }
 
-    public Part getPart(final String uuid) {
-        return parts.get(uuid);
+    public Optional<Part> getPart(final String uuid) {
+        validate(uuid);
+        return Optional.ofNullable(parts.get(uuid));
     }
 
-    public Part update(final Part part) {
-        return parts.replace(part.getId(), part);
+    public Optional<Part> update(final Part part) {
+        validate(part);
+        return Optional.ofNullable(parts.replace(part.getId(), part));
     }
 
-    public Optional<Part> delete(final String id) {
-        if (id == null)
-            return Optional.empty();
+    public Optional<Part> delete(final String uuid) {
+        validate(uuid);
+        return Optional.ofNullable(parts.remove(uuid));
+    }
 
-        Part removedPart = parts.remove(id);
-        if (removedPart == null)
-            return Optional.empty();
+    private void validate(final Part part) throws IllegalArgumentException {
+        validate(part.getId());
+        validate(part.getPart());
+    }
 
-        return Optional.of(removedPart);
+    private void validate(final SimplePart simplePart) throws IllegalArgumentException {
+        if (simplePart == null || simplePart.getName() == null || simplePart.getLocation() == null)
+            throw new IllegalArgumentException("Given simple part has missing properties!");
+    }
+
+    private void validate(final String uuid) throws IllegalArgumentException {
+        if (uuid == null)
+            throw new IllegalArgumentException("Given uuid must not be null!");
+
+        UUID.fromString(uuid); // Throws exception implicitly
     }
 
 }

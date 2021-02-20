@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/parts")
@@ -25,37 +24,101 @@ public class PartController {
         this.service = service;
     }
 
+    /**
+     * @param part is the payload to be saved.
+     * @return a request with status
+     * <ul>
+     *     <li>{@code 202} to inform, that the given part was saved successfully
+     *     and a location header pointing to the newly created resource.
+     *     </li>
+     *     <li>{@code 400}, if the payload is invalid.</li>
+     * </ul>
+     */
     @PostMapping
     public ResponseEntity<String> savePart(@RequestBody final SimplePart part) {
-        final String uuid = service.save(part);
+        try {
+            final String uuid = service.save(part);
 
-        if (uuid == null)
+            return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
+                    .path("/{uuid}")
+                    .buildAndExpand(uuid)
+                    .toUri())
+                    .build();
+        } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{uuid}").buildAndExpand(uuid).toUri();
-        return ResponseEntity.created(location).build();
+        }
     }
 
+    /**
+     * @return a list of all parts saved previously as a {@link PartList} instance.
+     */
     @GetMapping
     public PartList getParts() {
         return service.getParts();
     }
 
+    /**
+     * Used to fetch a single part out of the list of all parts.
+     *
+     * @param uuid specifies the part to be fetched.
+     * @return a request with status
+     * <ul>
+     *    <li>{@code 200} with requested part to inform.</li>
+     *    <li>{@code 404}, if there has no part been found.</li>
+     *    <li>{@code 400}, if the given uuid is invalid.</li>
+     * </ul>
+     */
     @GetMapping("/{uuid}")
-    public Part getPart(@PathVariable("uuid") final String uuid) {
-        return service.getPart(uuid);
+    public ResponseEntity<Part> getPart(@PathVariable("uuid") final String uuid) {
+        try {
+            return ResponseEntity.of(service.getPart(uuid));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
     }
 
+    /**
+     * Used to change certain properties of an existing part by passing the complete new part instance.
+     *
+     * @param part specifies the whole part to replace the old one with.
+     * @return a request with status
+     * <ul>
+     *    <li>{@code 200} with updated part to inform, that the given part was updated successfully.</li>
+     *    <li>{@code 404}, if there has no part been found to update.</li>
+     *    <li>{@code 400}, if the payload is invalid.</li>
+     * </ul>
+     */
     @PutMapping
-    public void updatePart(@RequestBody final Part part) {
-        service.update(part);
+    public ResponseEntity<Part> updatePart(@RequestBody final Part part) {
+        try {
+            return ResponseEntity.of(service.update(part));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
     }
 
+    /**
+     * Deletes a single part out of the list of all parts.
+     *
+     * @param uuid specifies the part to delete
+     * @return a request with status
+     * <ul>
+     *    <li>{@code 200} with deleted part to inform, that the given part was deleted successfully.</li>
+     *    <li>{@code 404}, if there has no part been found to delete.</li>
+     *    <li>{@code 400}, if the given uuid is invalid.</li>
+     * </ul>
+     */
     @DeleteMapping("/{uuid}")
     public ResponseEntity<Part> deletePart(@PathVariable("uuid") final String uuid) {
-        final Optional<Part> deletedPart = service.delete(uuid);
-
-        return ResponseEntity.of(deletedPart);
+        try {
+            return ResponseEntity.of(service.delete(uuid));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
     }
 
 }
