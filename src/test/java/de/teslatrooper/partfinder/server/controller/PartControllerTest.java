@@ -1,99 +1,100 @@
 package de.teslatrooper.partfinder.server.controller;
 
-import de.teslatrooper.partfinder.server.dto.Attribute;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.teslatrooper.partfinder.server.dto.Part;
 import de.teslatrooper.partfinder.server.dto.PartList;
 import de.teslatrooper.partfinder.server.dto.SimplePart;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import de.teslatrooper.partfinder.server.service.PartService;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.server.LocalServerPort;
-import org.springframework.http.ResponseEntity;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@RunWith(SpringRunner.class)
+@WebMvcTest(PartController.class)
+@AutoConfigureMockMvc
 public class PartControllerTest {
 
-    private static final String HOST = "http://localhost:";
-    private static final String PATH = "/part-finder-server/parts";
-
-    @LocalServerPort
-    private int port;
-
     @Autowired
-    private TestRestTemplate template;
+    private MockMvc mockMvc;
 
-    @Test
-    public void getPartsShouldReturnNonEmptyList() {
-        PartList parts = template.getForObject(HOST + port + PATH, PartList.class);
+    @MockBean
+    private PartService service;
 
-        assertThat(parts).isNotNull();
+    @Before
+    public void setup() {
+        PartList parts = new PartList();
+        Part part = new Part(new SimplePart("", "", 0));
+
+        Mockito.when(service.save(Mockito.any(SimplePart.class))).thenReturn(UUID.randomUUID().toString());
+        Mockito.when(service.getPart(Mockito.anyString())).thenReturn(Optional.of(part));
+        Mockito.when(service.getParts()).thenReturn(parts);
+        Mockito.when(service.update(Mockito.any(Part.class))).thenReturn(Optional.of(part));
+        Mockito.when(service.delete(Mockito.anyString())).thenReturn(Optional.of(part));
     }
 
     @Test
-    public void savePartShouldReturnIdAsString() {
-        ResponseEntity<String> response = template.postForEntity(HOST + port + PATH, createMockPart(), String.class);
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody()).isNotNull();
-        String uuid = UUID.fromString(response.getBody()).toString();
-
-        Part part = template.getForObject(HOST + port + PATH + "/" + uuid, Part.class);
-        assertThat(part).isNotNull();
+    public void testGetPart() throws Exception {
+        this.mockMvc.perform(get("/parts/some-id").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
     }
 
-    @Nested
-    @DisplayName("Test for altering parts")
-    class AlteringPartTest {
-
-        @BeforeEach
-        @DisplayName("Save mock part...")
-        public void saveMockPart() {
-            savePartShouldReturnIdAsString();
-        }
-
-        @Test
-        @DisplayName("Delete mock part...")
-        public void deletePartShouldRemoveExistingPart() {
-            PartList parts = template.getForObject(HOST + port + PATH, PartList.class);
-            Part partToDelete = parts.getParts().get(0);
-            template.delete(HOST + port + PATH + "/" + partToDelete.getId());
-
-            Part deletedPart = template.getForObject(HOST + port + PATH + "/" + partToDelete.getId(), Part.class);
-            assertThat(deletedPart).isNull();
-        }
-
-        @Test
-        @DisplayName("Update mock part...")
-        public void putPartShouldReturnOldElement() {
-            PartList parts = template.getForObject(HOST + port + PATH, PartList.class);
-            Part oldPart = parts.getParts().get(0);
-            Part newPart = createUpdatedMockPart(oldPart);
-
-            template.put(HOST + port + PATH, newPart);
-
-            Part updatedPart = template.getForObject(HOST + port + PATH + "/" + oldPart.getId(), Part.class);
-
-            assertThat(updatedPart.getPart().getLocation()).isEqualTo(newPart.getPart().getLocation());
-        }
-
+    @Test
+    public void testGetParts() throws Exception {
+        this.mockMvc.perform(get("/parts").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
     }
 
-    private SimplePart createMockPart() {
-        return new SimplePart("Schraube", "C5", 10, new Attribute[]{new Attribute("Kopf", "Kreuz")});
+    @Test
+    public void testSavePart() throws Exception {
+        String payload = asJsonString(new SimplePart("", "", 0));
+
+        this.mockMvc.perform(post("/parts")
+                .content(payload)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isCreated())
+                .andExpect(header().exists("LOCATION"));
     }
 
-    private Part createUpdatedMockPart(final Part ref) {
-        final SimplePart refSimplePart = ref.getPart();
+    @Test
+    public void testUpdatePart() throws Exception {
+        String payload = asJsonString(new Part(new SimplePart("", "", 0)));
 
-        return new Part(ref.getId(), new SimplePart(refSimplePart.getName(), "A3", refSimplePart.getQty(),
-                refSimplePart.getAttributes()));
+        this.mockMvc.perform(put("/parts")
+                .content(payload)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.ALL_VALUE))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void testDeletePart() throws Exception {
+        this.mockMvc.perform(delete("/parts/some-id")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
+    }
+
+    private static String asJsonString(final Object obj) throws JsonProcessingException {
+        return new ObjectMapper().writeValueAsString(obj);
     }
 
 }
